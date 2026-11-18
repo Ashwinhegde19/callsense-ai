@@ -1,0 +1,63 @@
+# Private learning and planning material
+tracking/
+docs/planning/
+docs/research/
+docs/distribution/
+private/
+local-notes/
+prompts/
+PROJECT_MAP.md
+
+# Local audio and evaluation data
+data/
+manifests/*.csv
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.ogg
+*.mp4
+
+# Model weights and generated artifacts
+models/
+checkpoints/
+outputs/
+artifacts/
+wandb/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.nemo
+*.gguf
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Python and local tools
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+.ipynb_checkpoints/
+*.log
+
+# Local editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
