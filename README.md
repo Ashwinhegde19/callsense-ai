@@ -16,7 +16,11 @@ Run:
 python scripts/inspect_audio.py path/to/recording.wav
 ```
 
-The inspector reports the sample rate, number of channels, frame count, and duration of an uncompressed PCM WAV recording.
+The inspector reports the sample rate, number of channels, frame count, sample width, duration, and peak amplitude of a 16-bit PCM WAV recording.
+
+`peak_amplitude` is the largest absolute sample value across all channels, normalized to the range 0.0 to 1.0. Audio is read in chunks, so large files do not need to fit in memory.
+
+Only 16-bit PCM is supported. Files with another sample width are rejected with an error.
 
 ## Run tests
 
