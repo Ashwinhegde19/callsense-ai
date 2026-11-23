@@ -1,0 +1,43 @@
+case_id,category,text,intended_amounts_inr,what_it_tests
+A01,standard,"आपका बिजली का बिल 1,450 रुपये आया है।",1450,Plain amount written as digits
+A02,standard,"इस महीने का किराया 12,500 रुपये है।",12500,Plain amount written as digits
+A03,standard,"आपके खाते में 750 रुपये जमा हो गए हैं।",750,Plain amount written as digits
+A04,standard,"delivery charge 99 रुपये लगेगा।",99,Small amount in a Hinglish sentence
+A05,standard,"आपकी loan की किश्त 8,999 रुपये है।",8999,Amount with four non-zero digits
+B01,look_alike,"पच्चीस रुपये का recharge कर दीजिए।",25,Pachees (25) against pachaas (50)
+B02,look_alike,"पचास रुपये का recharge कर दीजिए।",50,Pachaas (50) against pachees (25)
+B03,look_alike,"आपका refund 2,550 रुपये है।",2550,"2,550 against 2,450"
+B04,look_alike,"आपका refund 2,450 रुपये है।",2450,"2,450 against 2,550"
+B05,look_alike,"service charge fifteen rupees है।",15,Fifteen against fifty
+B06,look_alike,"service charge fifty rupees है।",50,Fifty against fifteen
+B07,look_alike,"टिकट उनतालीस रुपये का है।",39,Untaalees (39) against unchaas (49)
+B08,look_alike,"टिकट उनचास रुपये का है।",49,Unchaas (49) against untaalees (39)
+C01,hindi_compound,"मैंने डेढ़ सौ रुपये दिए थे।",150,Dedh sau
+C02,hindi_compound,"मैंने ढाई हज़ार रुपये pay किए थे।",2500,Dhai hazaar
+C03,hindi_compound,"total साढ़े तीन हज़ार रुपये के आस-पास था।",3500,Saadhe teen hazaar with an approximation phrase
+C04,hindi_compound,"मेरा share चौबीस सौ पचास रुपये है।",2450,Chaubees sau pachaas
+C05,hindi_compound,"सवा लाख रुपये का loan चाहिए।",125000,Sava lakh
+C06,hindi_compound,"पौने दो सौ रुपये बचे हैं।",175,Paune do sau
+D01,english_form,"आपका bill two thousand five hundred fifty rupees है।",2550,Amount fully in English words
+D02,english_form,"bill thirty six fifty rupees हुआ था।",3650,English shorthand without a unit word
+D03,english_form,"मैंने twelve hundred rupees transfer किए।",1200,Hundreds form above one thousand
+D04,english_form,"cashback ninety nine rupees मिलेगा।",99,Two-word English number
+D05,english_form,"salary two point five lakh rupees है।",250000,English decimal with lakh
+E01,large_amount,"गाड़ी की कीमत 1,25,000 रुपये है।",125000,Indian digit grouping in lakhs
+E02,large_amount,"flat की down payment ढाई लाख रुपये है।",250000,Dhai lakh
+E03,large_amount,"company का turnover तीन करोड़ रुपये है।",30000000,Crore
+E04,large_amount,"आपके account में 10,00,000 रुपये हैं।",1000000,Ten lakh written as digits
+E05,large_amount,"insurance cover 5,50,000 रुपये का है।",550000,Lakh amount with a thousands part
+F01,correction,"आपका refund 2,550 रुपये है, sorry, 2,450 रुपये है।",2550|2450,Retracted amount followed by its correction
+F02,correction,"bill 3,650 रुपये नहीं, 3,750 रुपये हुआ था।",3650|3750,Rejected amount followed by the right one
+F03,correction,"मैंने कहा था पचास रुपये, पच्चीस नहीं।",50|25,Correction between look-alike amounts
+F04,correction,"amount fifteen hundred नहीं, sixteen hundred rupees है।",1500|1600,Correction in English words
+G01,several_amounts,"खाना 850 रुपये, taxi 320 रुपये और tip 100 रुपये।",850|320|100,Three amounts in one sentence
+G02,several_amounts,"total 3,750 रुपये है, तो हर एक का 1,250 रुपये।",3750|1250,Total and share
+G03,several_amounts,"पुराना price 1,999 रुपये था, अब 1,499 रुपये है।",1999|1499,Two similar prices
+G04,several_amounts,"आपने 5,000 रुपये भेजे, charge 25 रुपये कटा, बचे 4,975 रुपये।",5000|25|4975,Three related amounts
+H01,non_money_numbers,"आपकी किश्त 2,800 रुपये है, जो हर महीने 10 तारीख को कटेगी।",2800,Amount next to a date
+H02,non_money_numbers,"आपका OTP 4821 है और payment 1,200 रुपये का है।",1200,Amount next to an OTP
+H03,non_money_numbers,"ऑर्डर नंबर 78213 का refund 499 रुपये है।",499,Amount next to an order number
+H04,non_money_numbers,"15 दिन में 3 किश्तों में 9,000 रुपये चुकाने हैं।",9000,Amount next to counts of days and instalments
+H05,non_money_numbers,"18 percent GST के साथ total 1,180 रुपये हुआ।",1180,Amount next to a percentage
