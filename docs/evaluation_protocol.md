@@ -1,0 +1,156 @@
+# Evaluation protocol: manifest format
+
+This document defines the format of the two manifests used to evaluate the research problem in [problem.md](problem.md). A manifest is a CSV file with one row per audio clip. It records where the clip came from, whether the project may use it, and the human-verified reference used for scoring.
+
+**Status on 2026-11-23**
+
+- Both manifests exist only as local templates containing the header row. They hold no clips.
+- No recordings have been collected, downloaded, or annotated.
+- The final test is **not locked**. See [Locking the final test](#locking-the-final-test).
+
+## The two manifests
+
+| File | Purpose | Allowed sources |
+| --- | --- | --- |
+| `manifests/dev_eval.csv` | Development: building the pipeline, defining normalization rules, analysing errors. | Sources cleared for development in [data_inventory.md](data_inventory.md), and recordings made for this project with consent. |
+| `manifests/final_test_locked.csv` | Final evaluation: each model is scored on it once, after the protocol is fixed. | Sources reserved for final evaluation in [data_inventory.md](data_inventory.md). |
+
+Both files use the same columns, so the same scoring code runs on either.
+
+Rules that apply to both:
+
+- A clip appears in at most one manifest.
+- A source that is reserved or unassigned in [data_inventory.md](data_inventory.md) never appears in `dev_eval.csv`.
+- No recording and no speaker appears in both manifests. Where speaker identity is unknown, the whole source is kept on one side.
+- Only rows with `permission_status` of `cleared` and `verification_status` of `double_checked` are scored.
+
+## Storage and version control
+
+- Manifest CSV files are ignored by Git through the existing `manifests/*.csv` rule in `.gitignore`. They are local files and are never committed.
+- Audio lives under `data/`, which is also ignored.
+- Because the manifests are not tracked, this document is the tracked definition of their format. Anyone can recreate an empty template from the header row below.
+
+## File conventions
+
+- Encoding: UTF-8 without a byte order mark. Line endings: LF.
+- Separator: comma. Fields containing a comma, a double quote, or a line break are enclosed in double quotes, with inner double quotes doubled (RFC 4180).
+- The first line is the header row, exactly as given below. Column order is fixed.
+- One row per clip. No blank rows and no comment lines.
+- An unknown or not-applicable value is an empty field. Words such as "NA" or "unknown" are not used.
+- Where one field holds several values, they are separated by a vertical bar (`|`) with no spaces.
+
+## Header row
+
+```text
+clip_id,source_dataset,source_reference,audio_path,audio_sha256,license,permission_status,speaker_ids,language,duration_seconds,transcript,verification_status,spoken_amounts_inr,amount_mention_count
+```
+
+## Columns
+
+### Clip ID and source
+
+| Column | Required | Format | Meaning |
+| --- | --- | --- | --- |
+| `clip_id` | Yes | Lowercase letters, digits, and hyphens | Identifier assigned by this project. Unique across both manifests and never reused. |
+| `source_dataset` | Yes | Lowercase slug | Where the clip comes from. Current slugs: `mucs-slr104`, `coshe-eval`, `vaani-benchmark-v1`, `project-recording`. A new slug is added here before it is used. |
+| `source_reference` | Yes | Free text | The identifier of the clip inside its source, such as the original file or utterance name, so the clip can be traced back. For `project-recording`, the recording session identifier. |
+
+### Audio path and file checksum
+
+| Column | Required | Format | Meaning |
+| --- | --- | --- | --- |
+| `audio_path` | Yes | Relative path with forward slashes | Path to the audio file from the repository root. It must be under `data/`. |
+| `audio_sha256` | Yes | 64 lowercase hexadecimal characters | SHA-256 of the audio file's bytes. Scoring refuses a clip whose file does not match. |
+
+Audio is stored as 16-bit PCM WAV, the format `scripts/inspect_audio.py` supports.
+
+### License or permission status
+
+| Column | Required | Format | Meaning |
+| --- | --- | --- | --- |
+| `license` | Yes | SPDX identifier, or `project-consent` | The terms the clip is used under, for example `CC-BY-SA-4.0`. `project-consent` means a recording made for this project with the speakers' written consent. |
+| `permission_status` | Yes | `cleared`, `pending`, or `not_cleared` | Whether the project has confirmed it may use the clip for evaluation. |
+
+- `cleared`: the license or consent is confirmed and covers this use.
+- `pending`: a question is open. Every open licensing item in [data_inventory.md](data_inventory.md) keeps the affected source at `pending`.
+- `not_cleared`: the clip may not be used. The row is kept only to record the decision.
+
+### Speaker ID
+
+| Column | Required | Format | Meaning |
+| --- | --- | --- | --- |
+| `speaker_ids` | No | Identifiers separated by a vertical bar | The speakers in the clip, in order of first speech. Empty when the source gives no speaker identity. |
+
+Identifiers are the source's own speaker IDs where they exist. For project recordings they are pseudonymous codes assigned by this project. Names and other personal details are never written to a manifest.
+
+### Language and duration
+
+| Column | Required | Format | Meaning |
+| --- | --- | --- | --- |
+| `language` | Yes | `hi-en`, `hi`, or `en` | `hi-en` for Hindi-English code-switched speech, `hi` for Hindi only, `en` for English only. |
+| `duration_seconds` | Yes | Decimal number | Clip length as reported by `scripts/inspect_audio.py`. |
+
+### Human-verified transcript
+
+| Column | Required | Format | Meaning |
+| --- | --- | --- | --- |
+| `transcript` | Yes for scored rows | Single line of text | What was said, word for word. No translation, no correction of the speakers, and no line breaks. |
+| `verification_status` | Yes | `unverified`, `verified`, or `double_checked` | How far human checking has gone for both the transcript and the amounts. |
+
+- `unverified`: no human has checked the row against the audio. A transcript taken from the source dataset starts here, even if the source describes it as verified.
+- `verified`: one person has listened to the whole clip and confirmed the transcript and amounts.
+- `double_checked`: a second person has independently confirmed them.
+
+A change of speaker inside the transcript is marked with `[S1]`, `[S2]`, and so on, numbered in the order given in `speaker_ids`.
+
+### Spoken monetary amounts
+
+| Column | Required | Format | Meaning |
+| --- | --- | --- | --- |
+| `spoken_amounts_inr` | No | Numbers separated by a vertical bar | Every monetary amount actually spoken in the clip, as a numeric rupee value, in the order spoken. |
+| `amount_mention_count` | Yes for scored rows | Whole number | The number of values in `spoken_amounts_inr`. |
+
+These two columns are the reference for the exact amount match rate defined in [problem.md](problem.md), and they follow its rules:
+
+- Every mention is listed, including amounts that are later corrected or rejected, and amounts that are repeated. Nothing is merged or removed.
+- The annotator records what was said, not what was meant, and does not mark which amount is final.
+- Each value is a plain number: digits with an optional decimal point, no currency symbol, no thousands separators, and no words.
+- A clip with no spoken amounts has an empty `spoken_amounts_inr` and an `amount_mention_count` of `0`.
+- An empty `amount_mention_count` means the clip has not been annotated for amounts yet.
+
+Format illustration only, not a manifest entry: for the fictional refund call in [problem.md](problem.md), the two fields would read `2500|2550|2450|2450|2450` and `5`.
+
+## Locking the final test
+
+The final test manifest is named `final_test_locked.csv` because it is meant to be frozen before any model is scored on it. It is **not locked yet**, and it is currently empty.
+
+Locking means:
+
+1. The development work is finished: normalization rules, pairing rules, and scoring code are fixed using `dev_eval.csv` only.
+2. This protocol and the scoring code are committed, and that commit is recorded below.
+3. Only then are reserved sources opened and the final manifest filled in and verified.
+4. The SHA-256 of the finished manifest file is recorded below, with the date.
+5. After that, the manifest is not edited. Each model is run on it once, and results are reported whatever they are.
+
+Until step 2 is complete, reserved datasets are not downloaded, listened to, or read, and `final_test_locked.csv` stays header-only.
+
+If a locked manifest has to change, for example because a clip turns out not to be cleared, the change is recorded here with its reason, and a new checksum replaces the old one.
+
+### Lock record
+
+| Field | Value |
+| --- | --- |
+| Status | Not locked |
+| Protocol and scoring code commit | Not recorded |
+| Locked on | Not recorded |
+| Manifest SHA-256 | Not recorded |
+| Number of clips | 0 |
+| Number of amount mentions | 0 |
+
+## Not yet decided
+
+- Script convention for the transcript: Devanagari for Hindi with Latin for English, or fully romanized.
+- Normalization rules that turn spoken forms into the numeric values in `spoken_amounts_inr`, including approximate amounts and shorthand. This is also open in [problem.md](problem.md).
+- Which reserved sources will make up the final test. The licensing and rights questions for CoSHE-Eval in [data_inventory.md](data_inventory.md) must be resolved before any of its clips can be `cleared`.
+- How development clips containing spoken monetary amounts will be obtained, since no reviewed dataset documents them.
+- Whether per-mention details, such as which speaker said each amount, need a second file. The current format records values and order only.
