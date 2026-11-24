@@ -71,6 +71,28 @@ class ExtractNumbersTests(unittest.TestCase):
         self.assert_numbers("thirty seven fifty", [3750])
         self.assert_numbers("छत्तीस पचास", [3650])
 
+    def test_english_words_written_in_devanagari(self) -> None:
+        self.assert_numbers("आपका बिल टू थाउजेंड फाइव हंड्रेड फिफ्टी रुपीस है", [2550])
+        self.assert_numbers("मैंने ट्वेल्व हंड्रेड रुपीस ट्रांसफर किए", [1200])
+        self.assert_numbers("कैशबैक नाइन्टी नाइन रुपीस मिलेगा", [99])
+        self.assert_numbers("बिल थर्टी सिक्स फिफ्टी रुपीस हुआ था", [3650])
+        self.assert_numbers("सैलरी टू पॉइंट फाइव लाख रुपीज़ है", [250000])
+        self.assert_numbers("अमाउंट फिफ्टीन हंड्रेड नहीं सिक्सटीन हंड्रेड रुपीज़ है", [1500, 1600])
+        self.assert_numbers("चार्ज फिफ्टीन रुपीज़ है", [15])
+        self.assert_numbers("चार्ज फिफ्टी रुपीज़ है", [50])
+
+    def test_ambiguous_devanagari_words_need_a_number_beside_them(self) -> None:
+        self.assert_numbers("वन विभाग का दफ़्तर", [])
+        self.assert_numbers("मुझे टू बी ऑनेस्ट नहीं पता", [])
+        self.assert_numbers("टू हंड्रेड रुपीज़", [200])
+        self.assert_numbers("फोर थाउजेंड", [4000])
+
+    def test_fraction_word_before_digits(self) -> None:
+        self.assert_numbers("पौने 200 रुपये बचे हैं", [175])
+        self.assert_numbers("साढ़े 3000 रुपये", [3500])
+        self.assert_numbers("सवा 200", [225])
+        self.assert_numbers("साढ़े 3 हज़ार", [3500])
+
     def test_several_numbers(self) -> None:
         self.assert_numbers("refund 2,550 रुपये है, sorry, 2,450 रुपये है", [2550, 2450])
         self.assert_numbers("पचास रुपये, पच्चीस नहीं", [50, 25])
@@ -128,9 +150,9 @@ class LenientReadingTests(unittest.TestCase):
 
     def test_no_two_numbers_share_a_sound_key(self) -> None:
         values_by_key: dict[str, set] = {}
-        for word, entry in scoring._LEXICON.items():
-            if not word.isascii() and entry[0] in ("number", "multiplier", "prefix"):
-                values_by_key.setdefault(scoring._fold(word), set()).add(entry)
+        for word in scoring._HINDI_NUMBER_WORDS:
+            values_by_key.setdefault(scoring._fold(word), set()).add(scoring._LEXICON[word])
+        self.assertGreater(len(values_by_key), 100)
         clashes = {key: values for key, values in values_by_key.items() if len(values) > 1}
         self.assertEqual(clashes, {})
 

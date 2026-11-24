@@ -147,7 +147,7 @@ Format illustration only, not a manifest entry: for the fictional refund call in
 
 Scoring is implemented in `scripts/amount_scoring.py` and produces the exact amount match rate defined in [problem.md](problem.md).
 
-**Reading numbers.** Every number in the model transcript is read, whether or not it is money: digits, Hindi number words in Devanagari, and English number words.
+**Reading numbers.** Every number in the model transcript is read, whether or not it is money: digits, Hindi number words in Devanagari, and English number words in either Latin or Devanagari script. A fraction word before digits applies to the leading unit, so "पौने 200" is read as 175.
 
 **Pairing.** The reference amounts of a clip are matched, in order, against the numbers read from the transcript. A reference mention is matched only by an equal numeric value, and one number in the transcript can match only one mention. Numbers in the transcript that match nothing, such as dates, are ignored. A reference mention with no match is a miss.
 
@@ -195,7 +195,7 @@ If a locked manifest has to change, for example because a clip turns out not to 
 ## Not yet decided
 
 - Script convention for the transcript: Devanagari for Hindi with Latin for English, or fully romanized.
-- The number-reading rules in `scripts/amount_scoring.py` are a first version and are not frozen. Not handled yet: romanised Hindi, English number words written in Devanagari, digit shorthand such as "36-50" for 3,650, and approximate amounts.
+- The number-reading rules in `scripts/amount_scoring.py` are a first version and are not frozen. Not handled yet: romanised Hindi, digit shorthand such as "36-50" for 3,650, and approximate amounts.
 - Which reserved sources will make up the final test. The licensing and rights questions for CoSHE-Eval in [data_inventory.md](data_inventory.md) must be resolved before any of its clips can be `cleared`.
 - How development clips containing spoken monetary amounts will be obtained, since no reviewed dataset documents them.
 - Whether per-mention details, such as which speaker said each amount, need a second file. The current format records values and order only.

@@ -49,6 +49,24 @@ _FRACTION_NUMBERS = {"डेढ़": Fraction(3, 2), "ढाई": Fraction(5, 2)
 # Words that adjust the number that follows: साढ़े तीन is 3.5, सवा दो is 2.25, पौने दो is 1.75.
 _FRACTION_PREFIXES = {"साढ़े": Fraction(1, 2), "सवा": Fraction(1, 4), "पौने": Fraction(-1, 4)}
 
+# English number words as they are written in Devanagari: टू थाउजेंड फाइव हंड्रेड.
+_DEVANAGARI_ENGLISH_ONES = {0: "ज़ीरो", 3: "थ्री", 5: "फाइव", 6: "सिक्स", 7: "सेवन", 9: "नाइन"}
+_DEVANAGARI_ENGLISH_TEENS = {
+    11: "इलेवन", 12: "ट्वेल्व", 13: "थर्टीन", 14: "फोर्टीन", 15: "फिफ्टीन", 16: "सिक्सटीन",
+    17: "सेवनटीन सेवेंटीन", 18: "एटीन", 19: "नाइनटीन नाइंटीन",
+}
+_DEVANAGARI_ENGLISH_TENS = {
+    20: "ट्वेंटी ट्वेन्टी", 30: "थर्टी", 40: "फोर्टी", 50: "फिफ्टी", 60: "सिक्सटी",
+    70: "सेवंटी सेवेंटी सेवन्टी", 80: "एटी", 90: "नाइंटी नाइन्टी",
+}
+_DEVANAGARI_ENGLISH_MULTIPLIERS = {
+    100: "हंड्रेड हन्ड्रेड", 1_000: "थाउजेंड थाउजंड थाउसेंड थाउसंड", 1_000_000: "मिलियन", 1_000_000_000: "बिलियन",
+}
+_DEVANAGARI_ENGLISH_POINT = "पॉइंट पॉइन्ट पाइंट प्वाइंट"
+# These are also ordinary words (वन is "forest", टू is "to", एट is "at"), so they are
+# read as numbers only when the word next to them is a number.
+_DEVANAGARI_ENGLISH_AMBIGUOUS = {1: "वन", 2: "टू", 4: "फोर", 8: "एट", 10: "टेन"}
+
 _DEVANAGARI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 _TOKEN = re.compile(r"\d+(?:,\d+)*(?:\.\d+)?|[a-z]+|[ऀ-ॣ॰-ॿ]+|[,;:.!?।॥()]")
 
@@ -78,10 +96,28 @@ def _build_lexicon() -> dict[str, tuple[str, Fraction]]:
         lexicon[_normalize(word)] = ("prefix", value)
     lexicon["point"] = ("point", Fraction(0))
     lexicon["and"] = ("and", Fraction(0))
+    for kind, table in (
+        ("english_one", _DEVANAGARI_ENGLISH_ONES),
+        ("number", _DEVANAGARI_ENGLISH_TEENS),
+        ("english_ten", _DEVANAGARI_ENGLISH_TENS),
+        ("multiplier", _DEVANAGARI_ENGLISH_MULTIPLIERS),
+        ("maybe_english_one", _DEVANAGARI_ENGLISH_AMBIGUOUS),
+    ):
+        for value, spellings in table.items():
+            for spelling in spellings.split():
+                lexicon[_normalize(spelling)] = (kind, Fraction(value))
+    for spelling in _DEVANAGARI_ENGLISH_POINT.split():
+        lexicon[_normalize(spelling)] = ("point", Fraction(0))
     return lexicon
 
 
 _LEXICON = _build_lexicon()
+_HINDI_NUMBER_WORDS = {
+    _normalize(spelling)
+    for spellings in (*_HINDI_UNITS.values(), " ".join(_FRACTION_NUMBERS), " ".join(_FRACTION_PREFIXES), "सौ हज़ार लाख करोड़ अरब")
+    for spelling in spellings.split()
+}
+_NUMBER_KINDS = ("literal", "number", "english_one", "english_ten", "multiplier", "point", "maybe_english_one")
 
 
 # Spelling-tolerant reading. A Devanagari word is reduced to a rough sound key, so that
@@ -99,11 +135,7 @@ def _fold(word: str) -> str:
     return re.sub(r"(.)\1+", r"\1", word)  # doubled letters count once
 
 
-_FOLDED = {
-    _fold(word): entry
-    for word, entry in _LEXICON.items()
-    if not word.isascii() and entry[0] in ("number", "multiplier", "prefix")
-}
+_FOLDED = {_fold(word): _LEXICON[word] for word in _HINDI_NUMBER_WORDS}
 _CURRENCY_ENDINGS = {_fold(_normalize(word)) for word in "रुपये रुपए रुपया रुपे रुपै रूपे".split()}
 
 
@@ -155,7 +187,25 @@ def _tokenize(text: str, lenient: bool = False) -> list[tuple[str, Fraction]]:
                 tokens.extend(parts)
                 continue
         tokens.append(entry or _OTHER)
-    return tokens
+    # A word such as टू counts as a number only beside another number: टू थाउजेंड.
+    resolved = []
+    for position, (kind, value) in enumerate(tokens):
+        if kind == "maybe_english_one":
+            before = tokens[position - 1][0] if position else "other"
+            after = tokens[position + 1][0] if position + 1 < len(tokens) else "other"
+            is_number = before in _NUMBER_KINDS or after in _NUMBER_KINDS
+            kind = ("number" if value >= 10 else "english_one") if is_number else "other"
+        resolved.append((kind, value))
+    return resolved
+
+
+def _apply_prefix_to_digits(value: Fraction, prefix: Fraction) -> Fraction:
+    """Read "पौने 200" as 175: the fraction belongs to the leading unit of a round number."""
+    if value.denominator == 1 and value >= 100:
+        for unit in (10_000_000, 100_000, 1_000, 100):
+            if value % unit == 0:
+                return (value / unit + prefix) * unit
+    return value + prefix
 
 
 def _as_number(value: Fraction) -> Number:
@@ -197,7 +247,8 @@ def extract_numbers(text: str, lenient: bool = False) -> list[Number]:
         if kind in ("literal", "number", "english_one", "english_ten"):
             is_word = kind != "literal"
             if prefix is not None:
-                current, prefix = value + prefix, None
+                current = value + prefix if is_word else _apply_prefix_to_digits(value, prefix)
+                prefix = None
             elif current is None:
                 current = value
             elif kind == "english_one" and after_english_ten:
