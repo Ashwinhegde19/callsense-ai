@@ -63,7 +63,7 @@ clip_id,source_dataset,source_reference,audio_path,audio_sha256,license,permissi
 - Synthetic clips belong in the development manifest only. They never enter the final test.
 - Results on synthetic clips are reported separately from results on real speech and are not combined with them.
 - `source_reference` gives the case ID, the audio condition, and the random seed, so a clip can be regenerated.
-- `transcript` holds the words the speech model was asked to say, after its own number expansion. The model can mis-speak, so the row stays `unverified` until a person has listened, like any other clip.
+- `transcript` holds the words the speech model was asked to say, after its own number expansion. The model can mis-speak, so the row starts as `unverified`. It can become `machine_checked` under the rule in the transcript section, and `verified` only when a person has listened.
 - `spoken_amounts_inr` holds the amounts the sentence was written to contain.
 - `speaker_ids` holds the synthetic voice name with a `tts-` prefix.
 - The audio condition is `clean`, or `phone_noise` for the same clip limited to the telephone band with noise added.
@@ -108,11 +108,21 @@ Identifiers are the source's own speaker IDs where they exist. For project recor
 | Column | Required | Format | Meaning |
 | --- | --- | --- | --- |
 | `transcript` | Yes for scored rows | Single line of text | What was said, word for word. No translation, no correction of the speakers, and no line breaks. |
-| `verification_status` | Yes | `unverified`, `verified`, or `double_checked` | How far human checking has gone for both the transcript and the amounts. |
+| `verification_status` | Yes | `unverified`, `machine_checked`, `verified`, or `double_checked` | How far checking has gone for both the transcript and the amounts. |
 
-- `unverified`: no human has checked the row against the audio. A transcript taken from the source dataset starts here, even if the source describes it as verified.
+- `unverified`: nothing has checked the row against the audio. A transcript taken from the source dataset starts here, even if the source describes it as verified.
+- `machine_checked`: speech recognition models agree that the audio contains the intended amounts. No person has listened. Synthetic clips only; see below.
 - `verified`: one person has listened to the whole clip and confirmed the transcript and amounts.
 - `double_checked`: a second person has independently confirmed them.
+
+**Machine check.** This status exists because, for a synthetic clip, the intended amounts are known from the sentence it was generated from. The only open question is whether the synthetic voice said them, and models can give evidence on that.
+
+- It applies only to rows with a synthetic `source_dataset`. For real speech the reference itself comes from listening, so a model's output cannot confirm it.
+- A clip passes when at least two models from different developers each recover every intended amount, using the lenient reading described under [Scoring](#scoring). Two versions or sizes of the same model count as one.
+- A clip that does not pass stays `unverified` and is listed for a person to listen to. A failure can mean the voice mis-spoke, a model misheard, or the scorer could not read the transcript.
+- The models used and the result for every clip are saved with the batch's outputs.
+- A machine check confirms the amounts, not every word of the transcript.
+- Results on `machine_checked` rows are preliminary and are labelled as machine-checked wherever they are reported. Models that took part in the check are favoured by it, because clips they misheard are the ones left out.
 
 A change of speaker inside the transcript is marked with `[S1]`, `[S2]`, and so on, numbered in the order given in `speaker_ids`.
 
@@ -153,7 +163,7 @@ Scoring is implemented in `scripts/amount_scoring.py` and produces the exact amo
 - The lenient reading sometimes reads an ordinary word as a number, for example साथ ("with") as 7. These are extra numbers and never count as matches, but they are a known source of noise.
 - The lenient reading is deliberately cautious. A person reading the transcript may still recover amounts that it misses.
 
-A result is official only for rows that are `cleared` and `double_checked`. Until then both scores are preliminary.
+A result is official only for rows that are `cleared` and `double_checked`. Until then both scores are preliminary, including results on `machine_checked` rows.
 
 ## Locking the final test
 
