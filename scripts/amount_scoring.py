@@ -3,12 +3,13 @@
 The scoring follows docs/problem.md: every reference amount mention counts, and a
 mention is matched only when the transcript contains exactly the same numeric value.
 
-Numbers are recognised when written as digits, as Hindi number words in Devanagari,
-or as English number words. Romanised Hindi ("dhai hazaar") and English words written
-in Devanagari are not recognised yet.
+Numbers are recognised when written as digits, as Hindi number words in Devanagari or
+in Latin letters ("dhai hazaar"), or as English number words in Latin or Devanagari.
 
 Two readings are available. The strict reading accepts only correctly spelled number
-words. The lenient reading also accepts common misspellings of Hindi number words.
+words; for Hindi in Latin letters, which has no standard spelling, it accepts a fixed
+list of usual spellings. The lenient reading also accepts common misspellings of Hindi
+number words.
 """
 
 import re
@@ -66,6 +67,50 @@ _DEVANAGARI_ENGLISH_POINT = "पॉइंट पॉइन्ट पाइंट 
 # These are also ordinary words (वन is "forest", टू is "to", एट is "at"), so they are
 # read as numbers only when the word next to them is a number.
 _DEVANAGARI_ENGLISH_AMBIGUOUS = {1: "वन", 2: "टू", 4: "फोर", 8: "एट", 10: "टेन"}
+
+# Hindi number words written in Latin letters: "bara hazar panch so" is 12,500.
+# Romanised Hindi has no standard spelling, so each number lists its usual spellings.
+# Words are compared through _roman_key, which ignores routine differences: "aa" for
+# "a", "ee" for "i", doubled consonants, "w" for "v", and a dropped final "h".
+_ROMAN_HINDI_UNITS = {
+    0: "shunya", 1: "ek", 2: "do", 3: "teen", 4: "char", 5: "panch", 6: "chhah chhe", 7: "saat", 8: "aath",
+    9: "nau", 10: "das dus", 11: "gyarah", 12: "barah", 13: "terah", 14: "chaudah", 15: "pandrah pandhrah",
+    16: "solah", 17: "satrah", 18: "atharah", 19: "unnis", 20: "bees", 21: "ikkis ekkis", 22: "bais",
+    23: "teis tais", 24: "chaubis", 25: "pachis pachchis", 26: "chhabbis", 27: "sattais", 28: "atthais",
+    29: "untis unatis", 30: "tees", 31: "ikattis iktis", 32: "battis", 33: "taintis tentis taitis",
+    34: "chauntis chautis", 35: "paintis pentis paitis", 36: "chhattis", 37: "saintis sentis saitis",
+    38: "adtis artis adatis aratis", 39: "untalis unatalis unchalis", 40: "chalis",
+    41: "iktalis ikatalis ektalis", 42: "bayalis byalis", 43: "taintalis tentalis taitalis",
+    44: "chavalis chauvalis", 45: "paintalis pentalis paitalis", 46: "chhiyalis chhyalis",
+    47: "saintalis sentalis saitalis", 48: "adtalis artalis adatalis aratalis", 49: "unchas unanchas",
+    50: "pachas", 51: "ikyavan ekyavan", 52: "bavan", 53: "tirpan tirepan tirapan", 54: "chauvan chauan",
+    55: "pachpan pachapan", 56: "chhappan", 57: "sattavan", 58: "atthavan", 59: "unsath unasath",
+    60: "saath", 61: "iksath ikasath eksath", 62: "basath", 63: "tirsath tiresath tirasath",
+    64: "chaunsath chausath", 65: "painsath pensath paisath", 66: "chhiyasath chhyasath",
+    67: "sadsath sarsath sadasath sarasath", 68: "adsath arsath adasath arasath", 69: "unhattar unahattar",
+    70: "sattar", 71: "ikhattar ikahattar ekhattar", 72: "bahattar", 73: "tihattar", 74: "chauhattar",
+    75: "pachhattar pachahattar", 76: "chhihattar", 77: "satahattar sathattar", 78: "athahattar athhattar",
+    79: "unasi unyasi", 80: "assi", 81: "ikyasi ekyasi", 82: "bayasi byasi", 83: "tirasi", 84: "chaurasi",
+    85: "pachasi", 86: "chhiyasi chhyasi", 87: "sattasi", 88: "atthasi", 89: "navasi", 90: "nabbe nabbey",
+    91: "ikyanve ikyanave ikyanbe", 92: "banve banave banbe", 93: "tiranve tiranave tiranbe",
+    94: "chauranve chauranave chauranbe", 95: "pachanve pachanave pachanbe panchanve panchanave panchanbe",
+    96: "chhiyanve chhiyanave chhiyanbe", 97: "sattanve sattanave sattanbe",
+    98: "atthanve atthanave atthanbe", 99: "ninyanve ninyanave ninyanbe",
+}
+_ROMAN_HINDI_MULTIPLIERS = {100: "sau so", 1_000: "hazar hajar", 100_000: "lakh", 10_000_000: "karod karor"}
+_ROMAN_HINDI_FRACTION_NUMBERS = {Fraction(3, 2): "dedh derh", Fraction(5, 2): "dhai adhai"}
+_ROMAN_HINDI_FRACTION_PREFIXES = {Fraction(1, 2): "sadhe sarhe", Fraction(1, 4): "sava", Fraction(-1, 4): "paune pauney"}
+# These are also ordinary English or Hindi words ("do", "so", "teen", "bees"; "bara" is
+# "big", "tera" is "your", "saath" is "with"). They are read as numbers only when the
+# same run of number words holds an unambiguous Hindi number word, or lakh or crore, or
+# when a rupee word follows the run. "so" must also come straight after a number.
+_ROMAN_HINDI_AMBIGUOUS = "do teen char chhah chhe saat bees tees barah terah chaudah saath so"
+# "do" is also "give". At the end of a run it is 2 only when a rupee word follows.
+_ROMAN_HINDI_GIVE = "do"
+# Never read as a number, even leniently: "no" would otherwise sound like nau (9).
+_ROMAN_HINDI_NEVER = "no"
+_ROMAN_CURRENCY_WORDS = "rupee rupees rupaye rupay rupe rupaya rupiya rupiye rupaiye rupye rs"
+_ROMAN_ANCHOR_WORDS = {"lakh", "lakhs", "lac", "lacs", "crore", "crores"}
 
 _DEVANAGARI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 _TOKEN = re.compile(r"\d+(?:,\d+)*(?:\.\d+)?|[a-z]+|[ऀ-ॣ॰-ॿ]+|[,;:.!?।॥()]")
@@ -165,28 +210,162 @@ def _is_devanagari_word(raw: str) -> bool:
     return "ऀ" <= raw[0] <= "ॿ" and raw[0] not in "।॥"
 
 
+# Romanised Hindi. A token carries a mark: "anchor" for an unambiguous Hindi number
+# word, "maybe" for one that needs support from its neighbours, "give" for "do", and
+# "currency" for a rupee word.
+Token = tuple[str, Fraction, str]
+_PLAIN: Token = ("other", Fraction(0), "")
+_CURRENCY: Token = ("other", Fraction(0), "currency")
+
+
+def _roman_key(word: str) -> str:
+    """Remove spelling differences that are only transliteration habits."""
+    word = word.replace("w", "v").replace("ee", "i").replace("oo", "u")
+    word = re.sub(r"(.)\1+", r"\1", word).replace("chch", "ch")
+    if len(word) > 2 and word[-1] == "h" and word[-2] in "aeiou":
+        word = word[:-1]
+    return word
+
+
+def _roman_fold(key: str) -> str:
+    """Reduce a key to a rough sound, for the lenient reading: "saade" for "sadhe"."""
+    for written, sound in (("kh", "k"), ("gh", "g"), ("jh", "j"), ("dh", "d"), ("bh", "b"), ("ph", "p"), ("sh", "s"), ("au", "o"), ("ou", "o"), ("z", "j")):
+        key = key.replace(written, sound)
+    return re.sub(r"(.)\1+", r"\1", key)  # "th" is kept: it separates saat (7) from saath (60)
+
+
+def _roman_spellings() -> list[tuple[str, str, Fraction]]:
+    spellings = []
+    for kind, table in (
+        ("number", {Fraction(value): words for value, words in _ROMAN_HINDI_UNITS.items()}),
+        ("multiplier", {Fraction(value): words for value, words in _ROMAN_HINDI_MULTIPLIERS.items()}),
+        ("number", _ROMAN_HINDI_FRACTION_NUMBERS),
+        ("prefix", _ROMAN_HINDI_FRACTION_PREFIXES),
+    ):
+        for value, words in table.items():
+            spellings.extend((word, kind, value) for word in words.split())
+    return spellings
+
+
+def _build_roman() -> tuple[dict[str, Token], dict[str, tuple[str, Fraction]]]:
+    ambiguous = {_roman_key(word) for word in _ROMAN_HINDI_AMBIGUOUS.split()}
+    exact: dict[str, Token] = {}
+    folded: dict[str, tuple[str, Fraction]] = {}
+    for word, kind, value in _roman_spellings():
+        key = _roman_key(word)
+        mark = "give" if key == _ROMAN_HINDI_GIVE else "maybe" if key in ambiguous else "anchor"
+        exact[key] = (kind, value, mark)
+        folded[_roman_fold(key)] = (kind, value)
+    folded.pop(_ROMAN_HINDI_NEVER, None)
+    return exact, folded
+
+
+_ROMAN, _ROMAN_FOLDED = _build_roman()
+_ROMAN_CURRENCY = {_roman_key(word) for word in _ROMAN_CURRENCY_WORDS.split()}
+_ROMAN_CURRENCY_FOLDED = {_roman_fold(key) for key in _ROMAN_CURRENCY}
+
+
+def _split_roman(folded: str, first: bool = True, parts_left: int = 4) -> list[Token] | None:
+    """Read a loosely spelled or run-together word such as "charso" (char so).
+
+    Inside a run-together word a part needs three letters, apart from "so" after a
+    number. This keeps "dobara" (again) from being read as "do bara".
+    """
+    if not folded:
+        return []
+    if folded in _ROMAN_CURRENCY_FOLDED:
+        return [_CURRENCY]
+    if parts_left == 0:
+        return None
+    for end in range(len(folded), 1, -1):
+        part = folded[:end]
+        entry = _ROMAN_FOLDED.get(part)
+        if entry is None:
+            continue
+        whole_word = first and end == len(folded)
+        if len(part) < 3 and not whole_word and (first or part != "so"):
+            continue
+        rest = _split_roman(folded[end:], False, parts_left - 1)
+        if rest is not None:
+            return [(*entry, "maybe"), *rest]
+    return None
+
+
+def _read_roman(word: str, lenient: bool) -> list[Token]:
+    key = _roman_key(word)
+    if key in _ROMAN_CURRENCY:
+        return [_CURRENCY]
+    if key in _ROMAN:
+        return [_ROMAN[key]]
+    if not lenient:
+        return []
+    return _split_roman(_roman_fold(key)) or []
+
+
+_RUN_KINDS = ("literal", "number", "english_one", "english_ten", "multiplier", "prefix", "maybe_english_one")
+_PLAIN_NUMBER_KINDS = ("literal", "number", "english_one", "english_ten")
+
+
+def _resolve_roman(tokens: list[Token]) -> list[tuple[str, Fraction]]:
+    """Decide which ambiguous romanised words are numbers, one run of number words at a time."""
+    resolved = [(kind, value) for kind, value, _ in tokens]
+    start = 0
+    while start < len(tokens):
+        if tokens[start][0] not in _RUN_KINDS:
+            start += 1
+            continue
+        end = start
+        while end < len(tokens) and tokens[end][0] in _RUN_KINDS:
+            end += 1
+        rupee_word_follows = end < len(tokens) and tokens[end][2] == "currency"
+        supported = rupee_word_follows or any(mark == "anchor" for _, _, mark in tokens[start:end])
+        for position in range(start, end):
+            kind, _, mark = tokens[position]
+            if mark not in ("maybe", "give"):
+                continue
+            keep = supported
+            if keep and kind == "multiplier":  # "so" is 100 only straight after a number
+                keep = position > start and resolved[position - 1][0] in _PLAIN_NUMBER_KINDS
+            if keep and mark == "give":  # a final "do" is usually "give"
+                keep = position + 1 < end or rupee_word_follows
+            if not keep:
+                resolved[position] = _OTHER
+        start = end
+    return resolved
+
+
 def _tokenize(text: str, lenient: bool = False) -> list[tuple[str, Fraction]]:
     raws = _TOKEN.findall(_normalize(text))
-    tokens = []
+    marked: list[Token] = []
     index = 0
     while index < len(raws):
         raw = raws[index]
         index += 1
         if raw[0].isdigit():
-            tokens.append(("literal", Fraction(raw.replace(",", ""))))
+            marked.append(("literal", Fraction(raw.replace(",", "")), ""))
             continue
         entry = _LEXICON.get(raw)
-        if entry is None and lenient and _is_devanagari_word(raw):
+        following = raws[index] if index < len(raws) else ""
+        if entry is not None:
+            marked.append((*entry, "anchor" if raw in _ROMAN_ANCHOR_WORDS else ""))
+        elif raw[0].isascii() and raw[0].isalpha():
+            parts = _read_roman(raw, lenient)
+            if not parts and lenient and following.isascii() and following.isalpha() and following not in _LEXICON and not _read_roman(following, lenient):
+                joined = _split_roman(_roman_fold(_roman_key(raw + following)))  # a number word written as two: un talis
+                if joined:
+                    parts = [(kind, value, mark or "maybe") for kind, value, mark in joined]
+                    index += 1
+            marked.extend(parts or [_PLAIN])
+        elif lenient and _is_devanagari_word(raw):
             parts = _read_tolerantly(raw)
-            following = raws[index] if index < len(raws) else ""
             if not parts and following and _is_devanagari_word(following) and following not in _LEXICON:
                 parts = _read_tolerantly(raw + following)  # a number word written as two: उन तालीस
                 if parts:
                     index += 1
-            if parts:
-                tokens.extend(parts)
-                continue
-        tokens.append(entry or _OTHER)
+            marked.extend((kind, value, "") for kind, value in (parts or [_OTHER]))
+        else:
+            marked.append(_PLAIN)
+    tokens = _resolve_roman(marked)
     # A word such as टू counts as a number only beside another number: टू थाउजेंड.
     resolved = []
     for position, (kind, value) in enumerate(tokens):
@@ -221,6 +400,10 @@ def extract_numbers(text: str, lenient: bool = False) -> list[Number]:
     that keep roughly the same sound, when run together, or when split in two. This
     reads more real amounts but also turns some ordinary words into numbers, for
     example साथ ("with") into 7. It never changes how correctly spelled text is read.
+
+    Hindi in Latin letters is read in both modes from a fixed list of usual spellings.
+    Words that are also ordinary words, such as "do" and "so", count only when the
+    words around them show a number is being said.
     """
     tokens = _tokenize(text, lenient)
     results: list[Number] = []

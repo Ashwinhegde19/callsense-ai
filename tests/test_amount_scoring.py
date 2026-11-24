@@ -93,6 +93,86 @@ class ExtractNumbersTests(unittest.TestCase):
         self.assert_numbers("सवा 200", [225])
         self.assert_numbers("साढ़े 3 हज़ार", [3500])
 
+    def test_romanized_hindi(self) -> None:
+        self.assert_numbers("bara hazar panch so", [12500])
+        self.assert_numbers("dhai hazaar", [2500])
+        self.assert_numbers("Aapka bill ek hazar chaar so pachaas rupaye aaya hai", [1450])
+        self.assert_numbers("refund do hazar paanch so pachaas rupaye hai, sorry, do hazar chaar so pachaas rupaye hai", [2550, 2450])
+        self.assert_numbers("gadi ki keemat ek lakh pachis hazaar rupe hai", [125000])
+        self.assert_numbers("turnover teen karor rupe hai", [30000000])
+        self.assert_numbers("account mein das lakh rupaye hain", [1000000])
+        self.assert_numbers("ninyanve rupaye", [99])
+        self.assert_numbers("sau rupaye", [100])
+
+    def test_romanized_hindi_spelling_variants(self) -> None:
+        self.assert_numbers("baarah hazaar paanch sau", [12500])
+        self.assert_numbers("barah hajar", [12000])
+        self.assert_numbers("BARA HAZAR", [12000])
+        for spelling in ("pachis", "pachees", "pachchis", "pacchis", "pachhis"):
+            self.assert_numbers(f"{spelling} hazar", [25000])
+        self.assert_numbers("bawan hazar", [52000])
+        self.assert_numbers("chhattees hazar", [36000])
+
+    def test_romanized_hindi_fraction_forms(self) -> None:
+        self.assert_numbers("dedh sau rupaye", [150])
+        self.assert_numbers("dhaai lakh", [250000])
+        self.assert_numbers("sadhe teen hazar", [3500])
+        self.assert_numbers("sawa do lakh", [225000])
+        self.assert_numbers("paune do sau", [175])
+        self.assert_numbers("sadhe 3 hazar", [3500])
+
+    def test_romanized_hindi_shorthand(self) -> None:
+        self.assert_numbers("chaar pachis rupe kata", [425])
+
+    def test_romanized_look_alike_amounts_stay_distinct(self) -> None:
+        for text, expected in [
+            ("saat rupaye", [7]), ("saath rupaye", [60]), ("satrah rupaye", [17]), ("sattar rupaye", [70]),
+            ("pachis rupaye", [25]), ("pachas rupaye", [50]), ("untalis rupaye", [39]), ("unchas rupaye", [49]),
+            ("tees rupaye", [30]), ("teis rupaye", [23]), ("bees rupaye", [20]), ("bais rupaye", [22]),
+        ]:
+            self.assert_numbers(text, expected)
+            self.assertEqual(scoring.extract_numbers(text, lenient=True), expected, text)
+
+    def test_ordinary_english_words_are_not_numbers(self) -> None:
+        for text in [
+            "please do so",
+            "so do I",
+            "I do not know what to do",
+            "so what should we do now",
+            "a teen sat at the bar",
+            "the bees char the tin",
+            "he sat down and had tees printed",
+            "no, that is not right",
+        ]:
+            self.assert_numbers(text, [])
+            self.assertEqual(scoring.extract_numbers(text, lenient=True), [], text)
+
+    def test_english_words_beside_real_numbers_are_left_out(self) -> None:
+        self.assert_numbers("I do not have 2000 rupees", [2000])
+        self.assert_numbers("do 20 pushups", [20])
+        self.assert_numbers("we sat for 3 hours", [3])
+        self.assert_numbers("so 500 rupees it is", [500])
+        self.assert_numbers("so ek hazar rupaye lagenge", [1000])
+        self.assert_numbers("ek hazar, so I left", [1000])
+
+    def test_ordinary_hindi_words_are_not_numbers(self) -> None:
+        self.assert_numbers("bara ghar hai", [])
+        self.assert_numbers("tera bill 500 rupaye hai", [500])
+        self.assert_numbers("GST ke saath total ek hazar ek so assi rupaye", [1180])
+        self.assert_numbers("do teen din mein aayega", [])
+
+    def test_ambiguous_romanized_words_count_with_support(self) -> None:
+        self.assert_numbers("do hazar", [2000])
+        self.assert_numbers("do lakh", [200000])
+        self.assert_numbers("do rupaye", [2])
+        self.assert_numbers("teen so bees rupe", [320])
+        self.assert_numbers("bara rupaye", [12])
+
+    def test_romanized_do_meaning_give(self) -> None:
+        self.assert_numbers("mujhe paanch so do", [500])
+        self.assert_numbers("paanch so rupaye de do", [500])
+        self.assert_numbers("ek hazar do rupaye", [1002])
+
     def test_several_numbers(self) -> None:
         self.assert_numbers("refund 2,550 रुपये है, sorry, 2,450 रुपये है", [2550, 2450])
         self.assert_numbers("पचास रुपये, पच्चीस नहीं", [50, 25])
@@ -129,8 +209,37 @@ class LenientReadingTests(unittest.TestCase):
         self.assert_readings("उन तालीस रुपे", [], [39])
         self.assert_readings("उन्चा स्रुपे", [], [49])
 
+    def test_loosely_spelled_romanized_hindi(self) -> None:
+        self.assert_readings("saade saat so rupaye", [700], [750])
+        self.assert_readings("pone do so rupee", [200], [175])
+        self.assert_readings("charso rupe", [], [400])
+        self.assert_readings("do hazar charso pachas", [2000, 50], [2450])
+        self.assert_readings("un talis rupe", [], [39])
+        self.assert_readings("pachasrupe", [], [50])
+
+    def test_lenient_romanized_reading_leaves_ordinary_words_alone(self) -> None:
+        # "no" sounds like nau (9) and "dobara" (again) looks like "do bara".
+        self.assert_readings("ek hazar no do hazar", [1000, 2000], [1000, 2000])
+        self.assert_readings("ek hazar dobara bhejo", [1000], [1000])
+        self.assert_readings("dobara ek hazar rupaye bhejo", [1000], [1000])
+
+    def test_romanized_dropped_words_are_not_repaired(self) -> None:
+        # "patas" is not "pachas", so neither reading may report 1,450.
+        self.assertNotIn(1450, scoring.extract_numbers("ek hazar chaar so patas rupaye", lenient=True))
+
+    def test_no_two_romanized_numbers_share_a_key(self) -> None:
+        for key_of in (scoring._roman_key, lambda word: scoring._roman_fold(scoring._roman_key(word))):
+            values_by_key: dict[str, set] = {}
+            for word, kind, value in scoring._roman_spellings():
+                values_by_key.setdefault(key_of(word), set()).add((kind, value))
+            self.assertGreater(len(values_by_key), 150)
+            clashes = {key: values for key, values in values_by_key.items() if len(values) > 1}
+            self.assertEqual(clashes, {})
+
     def test_correct_spelling_reads_the_same_in_both(self) -> None:
         for text, expected in [
+            ("bara hazar panch so", [12500]),
+            ("dhai hazaar", [2500]),
             ("दो हज़ार आठ सौ रुपये", [2800]),
             ("साढ़े तीन हज़ार", [3500]),
             ("refund 2,550 रुपये है, sorry, 2,450 रुपये है", [2550, 2450]),

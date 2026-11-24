@@ -147,7 +147,16 @@ Format illustration only, not a manifest entry: for the fictional refund call in
 
 Scoring is implemented in `scripts/amount_scoring.py` and produces the exact amount match rate defined in [problem.md](problem.md).
 
-**Reading numbers.** Every number in the model transcript is read, whether or not it is money: digits, Hindi number words in Devanagari, and English number words in either Latin or Devanagari script. A fraction word before digits applies to the leading unit, so "पौने 200" is read as 175.
+**Reading numbers.** Every number in the model transcript is read, whether or not it is money: digits, Hindi number words in either Devanagari or Latin letters, and English number words in either Latin or Devanagari script. A fraction word before digits applies to the leading unit, so "पौने 200" is read as 175.
+
+**Hindi in Latin letters.** Romanised Hindi has no standard spelling, so the scorer holds a fixed list of usual spellings for each number word. Routine differences are ignored: "aa" for "a", "ee" for "i", doubled consonants, "w" for "v", and a dropped final "h". So "bara hazar panch so" and "baarah hazaar paanch sau" both read as 12,500.
+
+Some of these words are also ordinary English or Hindi words: "do", "so", "teen", "char", "saat", "bees", "tees", "bara" (big), "tera" (your), "saath" (with). They are read as numbers only with support:
+
+- The same run of number words holds an unambiguous Hindi number word, or lakh or crore, as in "do hazar". Digits and English number words do not count as support.
+- Or a rupee word follows the run, as in "teen so bees rupe".
+- "so" is read as 100 only straight after a number.
+- "do" at the end of a run is read as 2 only when a rupee word follows, because it usually means "give".
 
 **Pairing.** The reference amounts of a clip are matched, in order, against the numbers read from the transcript. A reference mention is matched only by an equal numeric value, and one number in the transcript can match only one mention. Numbers in the transcript that match nothing, such as dates, are ignored. A reference mention with no match is a miss.
 
@@ -155,13 +164,14 @@ Scoring is implemented in `scripts/amount_scoring.py` and produces the exact amo
 
 | Score | What counts as reading the amount | Role |
 | --- | --- | --- |
-| Strict | Digits and correctly spelled number words only. | Primary. This is the exact amount match rate. |
-| Lenient | The same, plus Hindi number words that are misspelled with roughly the same sound, run together, or split in two. | Secondary. Shows how much of the strict shortfall is spelling. |
+| Strict | Digits and correctly spelled number words only. For Hindi in Latin letters, the listed spellings. | Primary. This is the exact amount match rate. |
+| Lenient | The same, plus Hindi number words, in either script, that are misspelled with roughly the same sound, run together, or split in two. | Secondary. Shows how much of the strict shortfall is spelling. |
 
 - The lenient reading does not repair an amount when a word is missing or has been replaced by a different word.
 - No two different numbers share a lenient spelling, so look-alike amounts such as 25 and 50 stay distinct. A unit test enforces this.
 - The lenient reading sometimes reads an ordinary word as a number, for example साथ ("with") as 7. These are extra numbers and never count as matches, but they are a known source of noise.
 - The lenient reading is deliberately cautious. A person reading the transcript may still recover amounts that it misses.
+- Latin letters do not separate some Hindi sounds. "saat" is read as 7 and "saath" as 60, so a model that writes "saath so" for seven hundred is scored as a miss.
 
 A result is official only for rows that are `cleared` and `double_checked`. Until then both scores are preliminary, including results on `machine_checked` rows.
 
@@ -195,7 +205,7 @@ If a locked manifest has to change, for example because a clip turns out not to 
 ## Not yet decided
 
 - Script convention for the transcript: Devanagari for Hindi with Latin for English, or fully romanized.
-- The number-reading rules in `scripts/amount_scoring.py` are a first version and are not frozen. Not handled yet: romanised Hindi, digit shorthand such as "36-50" for 3,650, and approximate amounts.
+- The number-reading rules in `scripts/amount_scoring.py` are a first version and are not frozen. Not handled yet: digit shorthand such as "36-50" for 3,650, and approximate amounts.
 - Which reserved sources will make up the final test. The licensing and rights questions for CoSHE-Eval in [data_inventory.md](data_inventory.md) must be resolved before any of its clips can be `cleared`.
 - How development clips containing spoken monetary amounts will be obtained, since no reviewed dataset documents them.
 - Whether per-mention details, such as which speaker said each amount, need a second file. The current format records values and order only.

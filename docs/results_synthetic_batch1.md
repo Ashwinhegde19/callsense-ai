@@ -4,6 +4,8 @@
 
 This document records the first measurements made for the research problem in [problem.md](problem.md). They were produced on 2026-11-23 and 2026-11-24.
 
+The scores were recalculated on 2026-11-24 from the saved transcripts, after the scorer learned to read Hindi written in Latin letters. No model was run again. Only the Nemotron row changed.
+
 **Read this first.** These results are preliminary. Every clip is synthetic speech from one text-to-speech voice. No person has listened to any clip. The results say how some models handle clear, generated speech containing rupee amounts. They do not test the project's hypothesis, which is about natural two-speaker conversations.
 
 ## What was tested
@@ -38,7 +40,7 @@ Exact amount match, out of 52 intended amounts per condition.
 | Sarvam Saaras v4, as-spoken mode | 50 (96%) | 50 (96%) | 50 (96%) | 50 (96%) |
 | Whisper large-v3 | 44 (85%) | 50 (96%) | 40 (77%) | 49 (94%) |
 | Whisper small | 16 (31%) | 25 (48%) | 17 (33%) | 23 (44%) |
-| Nemotron 3 Nano Omni | 9 (17%) | 9 (17%) | Not run | Not run |
+| Nemotron 3 Nano Omni | 22 (42%) | 23 (44%) | Not run | Not run |
 
 Clean audio by category, shown as strict / lenient matches out of the category total:
 
@@ -60,7 +62,7 @@ Clean audio by category, shown as strict / lenient matches out of the category t
 - **Clip D02 ("thirty six fifty").** Sarvam's as-spoken mode wrote "टर्डी सिक्स फिफ्टी" on clean audio. Its digits mode wrote 3,650.
 - **Whisper large-v3 spelling.** Six of its strict misses on clean audio are number words spelled non-standardly, such as "सो" for "सौ" and "साथ" for "सात". The lenient score accepts them.
 - **Whisper small.** Most number words are misspelled, run together, or partly dropped. The lenient score recovers 9 of its 36 strict misses on clean audio. Many of the rest have a word missing, for example "एक हजार सो पतास" for 1,450.
-- **Nemotron 3 Nano Omni.** It wrote Hindi in Latin letters for all 42 clips, for example "bara hazar panch so rupe" for 12,500. The scorer does not read Latin-script Hindi, so its score counts only amounts it wrote in English words or digits. Its score here is not a measure of what it heard. An informal reading of its transcripts suggests most amounts are present.
+- **Nemotron 3 Nano Omni.** It wrote Hindi in Latin letters for all 42 clips, for example "bara hazar panch so rupe" for 12,500. Before the scorer read Latin-script Hindi its score was 9 of 52; it is now 22 strict and 23 lenient. Most of its remaining misses are number words with a changed or missing sound, such as "patas" for pachas (50) and "ni nanve" for ninyanve (99), which neither reading repairs. In clip A03 it wrote "saade saath so" where 750 was intended; the scorer reads "saath" as 60, so this counts as a miss although a person would probably accept it.
 
 ## Machine check
 
@@ -91,7 +93,7 @@ Following the rule in [evaluation_protocol.md](evaluation_protocol.md), a clean 
 
 ## Known gaps in the scorer
 
-- Hindi written in Latin letters ("dhai hazaar") is not read.
+- Hindi written in Latin letters is read from a fixed list of spellings. It cannot tell "saath" meaning 7 from "saath" meaning 60, and it reads "do" after an amount as "give" unless a rupee word follows.
 - Digit shorthand such as "36-50" for 3,650 or "12-100" for 1,200 is read as two numbers.
 - The lenient reading sometimes turns ordinary words into numbers. These never count as matches but add noise.
 
